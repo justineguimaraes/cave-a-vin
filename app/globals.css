@@ -24,3 +24,20 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Scrollbar fine & discrète */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b08a8a #f7f2ef;
+}
+*::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #b08a8a;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: #f7f2ef;
+}
