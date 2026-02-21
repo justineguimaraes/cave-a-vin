@@ -23,15 +23,24 @@ type Bouteille = {
   accords: string | null
   date_limite: string | null
   region_id: number
+  // 🆕 champs ajoutés
+  date_achat?: string | null
+  prix?: number | null
 }
 
 const typeColor = (t: string | null) => {
-  if (t === 'rouge') return 'bg-[#7b2d26]'        // bordeaux profond
-  if (t === 'blanc') return 'bg-[#d2c27b]'       // blanc doré
-  if (t === 'rosé' || t === 'rose') return 'bg-[#f2b6c1]' // rosé
+  if (t === 'rouge') return 'bg-[#7b2d26]'                           // bordeaux profond
+  if (t === 'blanc') return 'bg-white border border-zinc-400'        // ✅ pastille blanche visible
+  if (t === 'rosé' || t === 'rose') return 'bg-[#f2b6c1]'            // rosé
   return 'bg-zinc-500'
 }
 
+// Helpers d’affichage
+const formatDateFR = (v?: string | null) =>
+  v ? new Date(v).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+
+const formatPrixEUR = (v?: number | null) =>
+  v == null ? '—' : new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v)
 
 export default function Cave() {
   const [comps, setComps] = useState<Compartiment[]>([])
@@ -54,6 +63,10 @@ export default function Cave() {
   const [savingAdd, setSavingAdd] = useState(false)
   const [addCompartiment, setAddCompartiment] = useState<number>(1)
   const [addAnneeLimite, setAddAnneeLimite] = useState<number | ''>('')
+
+  // 🆕 états pour Date d’achat + Prix
+  const [addDateAchat, setAddDateAchat] = useState<string>('')      // ex. '2025-11-15'
+  const [addPrix, setAddPrix] = useState<number | ''>('')           // ex. 24.90
 
   useEffect(() => {
     const load = async () => {
@@ -80,16 +93,16 @@ export default function Cave() {
   }, [comps, pillars])
 
   const getRegionIdByPillarAndCompartiment = (pillar: number, compartiment: number): number | null => {
-  const list = compsByPillar.get(pillar) ?? []
-  const hit = list.find(x => x.compartiment === compartiment)
-  return hit ? hit.region_id : null
-}
+    const list = compsByPillar.get(pillar) ?? []
+    const hit = list.find(x => x.compartiment === compartiment)
+    return hit ? hit.region_id : null
+  }
 
-const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: number): string | null => {
-  const list = compsByPillar.get(pillar) ?? []
-  const hit = list.find(x => x.compartiment === compartiment)
-  return hit ? hit.region_nom : null
-}
+  const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: number): string | null => {
+    const list = compsByPillar.get(pillar) ?? []
+    const hit = list.find(x => x.compartiment === compartiment)
+    return hit ? hit.region_nom : null
+  }
 
   // Titre de pilier = concaténation des noms de régions de ce pilier (sans doublons)
   const pillarTitle = (p: number) => {
@@ -130,85 +143,92 @@ const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: numb
 
   // Ouvrir la modale d’ajout pour un pilier
   const openAddForPillar = (p: number) => {
-  setAddForPillar(p)
-  const regions = compsByPillar.get(p) ?? []
-  // par défaut : prendre le plus petit numéro de compartiment dispo dans ce pilier
-  const defaultCompart = regions.length > 0 ? regions.map(r => r.compartiment).sort((a,b)=>a-b)[0] : 1
-  setAddCompartiment(defaultCompart)
+    setAddForPillar(p)
+    const regions = compsByPillar.get(p) ?? []
+    // par défaut : prendre le plus petit numéro de compartiment dispo dans ce pilier
+    const defaultCompart = regions.length > 0 ? regions.map(r => r.compartiment).sort((a,b)=>a-b)[0] : 1
+    setAddCompartiment(defaultCompart)
 
-  const rid = getRegionIdByPillarAndCompartiment(p, defaultCompart)
-  setAddRegionId(rid)
+    const rid = getRegionIdByPillarAndCompartiment(p, defaultCompart)
+    setAddRegionId(rid)
 
-  setAddNom('')
-  setAddAnnee('')
-  setAddDomaine('')
-  setAddTypeVin('')
-  setAddCepage('')
-  setAddAccords('')
-  setAddTempsConservation('')
-  setAddQuantite(1)
-  setAddAnneeLimite('')
-}
+    setAddNom('')
+    setAddAnnee('')
+    setAddDomaine('')
+    setAddTypeVin('')
+    setAddCepage('')
+    setAddAccords('')
+    setAddTempsConservation('')
+    setAddQuantite(1)
+    setAddAnneeLimite('')
+
+    // 🆕 reset des nouveaux champs
+    setAddDateAchat('')
+    setAddPrix('')
+  }
 
   // Insert en “quantité” (plusieurs exemplaires)
   const submitAdd = async (e: React.FormEvent) => {
-  e.preventDefault()
-  if (!addForPillar) return
+    e.preventDefault()
+    if (!addForPillar) return
 
-  // Résoudre la région par pilier + numéro de compartiment
-  const targetRegionId = getRegionIdByPillarAndCompartiment(addForPillar, addCompartiment)
-  if (!targetRegionId) {
-    alert('Ce numéro de compartiment n’existe pas pour ce pilier.')
-    return
-  }
-  if (!addNom || addQuantite < 1) return
-
-  // Calculs : date_limite et/ou temps_conservation
-  const qte = Math.min(Math.max(addQuantite, 1), 48) // 1..48
-  const dateLimite =
-    addAnneeLimite !== '' ? `${addAnneeLimite}-12-31` : null
-
-  // Si l’utilisateur a fourni année + année limite mais pas de temps_conservation,
-  // on peut déduire temps_conservation = année_limite - année (min 0)
-  let computedTemps: number | null =
-    addTempsConservation === '' ? null : Number(addTempsConservation)
-  if (computedTemps === null && addAnnee !== '' && addAnneeLimite !== '') {
-    const diff = Number(addAnneeLimite) - Number(addAnnee)
-    computedTemps = diff >= 0 ? diff : 0
-  }
-
-  const payload = Array.from({ length: qte }).map(() => ({
-    nom: addNom,
-    annee: addAnnee === '' ? null : Number(addAnnee),
-    domaine: addDomaine || null,
-    type_vin: addTypeVin || null,
-    cepage: addCepage || null,
-    accords: addAccords || null,
-    temps_conservation: computedTemps,
-    date_limite: dateLimite, // ✅ appliquée si fournie
-    region_id: targetRegionId
-  }))
-
-  setSavingAdd(true)
-  const { error } = await supabase.from('bouteilles').insert(payload)
-  setSavingAdd(false)
-  if (!error) {
-    // refresh compteurs
-    const { data: compRefresh } = await supabase.from('v_compartiments').select('*')
-    setComps((compRefresh ?? []) as any)
-
-    // si la modale de ce compartiment est ouverte, refresh la liste
-    if (selectedRegion && selectedRegion.region_id === targetRegionId) {
-      const { data } = await supabase
-        .from('v_bouteilles_par_compartiment').select('*')
-        .eq('region_id', targetRegionId)
-        .order('date_limite', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true })
-      setBouteilles((data ?? []) as any)
+    // Résoudre la région par pilier + numéro de compartiment
+    const targetRegionId = getRegionIdByPillarAndCompartiment(addForPillar, addCompartiment)
+    if (!targetRegionId) {
+      alert('Ce numéro de compartiment n’existe pas pour ce pilier.')
+      return
     }
-    setAddForPillar(null)
+    if (!addNom || addQuantite < 1) return
+
+    // Calculs : date_limite et/ou temps_conservation
+    const qte = Math.min(Math.max(addQuantite, 1), 48) // 1..48
+    const dateLimite =
+      addAnneeLimite !== '' ? `${addAnneeLimite}-12-31` : null
+
+    // Si l’utilisateur a fourni année + année limite mais pas de temps_conservation,
+    // on peut déduire temps_conservation = année_limite - année (min 0)
+    let computedTemps: number | null =
+      addTempsConservation === '' ? null : Number(addTempsConservation)
+    if (computedTemps === null && addAnnee !== '' && addAnneeLimite !== '') {
+      const diff = Number(addAnneeLimite) - Number(addAnnee)
+      computedTemps = diff >= 0 ? diff : 0
+    }
+
+    const payload = Array.from({ length: qte }).map(() => ({
+      nom: addNom,
+      annee: addAnnee === '' ? null : Number(addAnnee),
+      domaine: addDomaine || null,
+      type_vin: addTypeVin || null,
+      cepage: addCepage || null,
+      accords: addAccords || null,
+      temps_conservation: computedTemps,
+      date_limite: dateLimite,        // ✅ appliquée si fournie
+      region_id: targetRegionId,
+      // 🆕 nouveaux champs
+      date_achat: addDateAchat || null,
+      prix: addPrix === '' ? null : Number(addPrix),
+    }))
+
+    setSavingAdd(true)
+    const { error } = await supabase.from('bouteilles').insert(payload)
+    setSavingAdd(false)
+    if (!error) {
+      // refresh compteurs
+      const { data: compRefresh } = await supabase.from('v_compartiments').select('*')
+      setComps((compRefresh ?? []) as any)
+
+      // si la modale de ce compartiment est ouverte, refresh la liste
+      if (selectedRegion && selectedRegion.region_id === targetRegionId) {
+        const { data } = await supabase
+          .from('v_bouteilles_par_compartiment').select('*')
+          .eq('region_id', targetRegionId)
+          .order('date_limite', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true })
+        setBouteilles((data ?? []) as any)
+      }
+      setAddForPillar(null)
+    }
   }
-}
 
   return (
     <main className="min-h-screen">
@@ -399,7 +419,7 @@ const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: numb
 
                   {/* Détails sélection */}
                   {selectedBouteille && (
-                    <div className="mt-4 p-4 rounded-xl bg-[#21171d] ring-1 ring-[#2a1a21]">
+                    <div className="mt-4 p-4 rounded-xl bg-[#21171d] ring-1 ring-[#2a1a1]">
                       <h4 className="font-semibold text-[#f0e6e4]">
                         {selectedBouteille.nom} {selectedBouteille.annee ? `(${selectedBouteille.annee})` : ''}
                       </h4>
@@ -408,6 +428,10 @@ const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: numb
                       </p>
                       <p className="text-sm text-zinc-300">Accords : {selectedBouteille.accords ?? '—'}</p>
                       <p className="text-sm text-zinc-300">À boire avant : {selectedBouteille.date_limite ? new Date(selectedBouteille.date_limite).toLocaleDateString() : '—'}</p>
+
+                      {/* 🆕 affichage des nouveaux champs */}
+                      <p className="text-sm text-zinc-300">Date d’achat : {formatDateFR(selectedBouteille.date_achat)}</p>
+                      <p className="text-sm text-zinc-300">Prix : {formatPrixEUR(selectedBouteille.prix)}</p>
                     </div>
                   )}
                 </>
@@ -433,150 +457,176 @@ const getRegionNameByPillarAndCompartiment = (pillar: number, compartiment: numb
             </div>
 
             <form onSubmit={submitAdd} className="space-y-3">
-            {/* Ligne : numéro de compartiment + quantité */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">N° de compartiment</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={4} // adapte si tu as > 4 compartiments par pilier
-                  value={addCompartiment}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    setAddCompartiment(v)
-                    const rid = getRegionIdByPillarAndCompartiment(addForPillar!, v)
-                    setAddRegionId(rid)
-                  }}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                  required
-                />
-                <p className="mt-1 text-xs text-zinc-400">
-                  Région : {addForPillar && addCompartiment ? (getRegionNameByPillarAndCompartiment(addForPillar, addCompartiment) ?? '—') : '—'}
-                </p>
+              {/* Ligne : numéro de compartiment + quantité */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">N° de compartiment</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={4} // adapte si tu as > 4 compartiments par pilier
+                    value={addCompartiment}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      setAddCompartiment(v)
+                      const rid = getRegionIdByPillarAndCompartiment(addForPillar!, v)
+                      setAddRegionId(rid)
+                    }}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Région&nbsp;: {addForPillar && addCompartiment ? (getRegionNameByPillarAndCompartiment(addForPillar, addCompartiment) ?? '—') : '—'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Quantité</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={48}
+                    value={addQuantite}
+                    onChange={(e) => setAddQuantite(Number(e.target.value))}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Année limite (à boire avant)</label>
+                  <input
+                    type="number"
+                    value={addAnneeLimite}
+                    onChange={(e) => setAddAnneeLimite(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    placeholder="ex : 2030"
+                  />
+                </div>
               </div>
 
+              {/* Ligne : nom + année */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Nom *</label>
+                  <input
+                    value={addNom}
+                    onChange={(e) => setAddNom(e.target.value)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Année</label>
+                  <input
+                    type="number"
+                    value={addAnnee}
+                    onChange={(e) => setAddAnnee(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    placeholder="ex : 2018"
+                  />
+                </div>
+              </div>
+
+              {/* Ligne : domaine + type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Domaine</label>
+                  <input
+                    value={addDomaine}
+                    onChange={(e) => setAddDomaine(e.target.value)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Type</label>
+                  <select
+                    value={addTypeVin}
+                    onChange={(e) => setAddTypeVin(e.target.value as any)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  >
+                    <option value="">—</option>
+                    <option value="rouge">rouge</option>
+                    <option value="blanc">blanc</option>
+                    <option value="rosé">rosé</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Ligne : cépage + accords */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
+                  <input
+                    value={addCepage}
+                    onChange={(e) => setAddCepage(e.target.value)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Accords</label>
+                  <input
+                    value={addAccords}
+                    onChange={(e) => setAddAccords(e.target.value)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  />
+                </div>
+              </div>
+
+              {/* Temps de conservation */}
               <div>
-                <label className="block text-sm text-zinc-300 mb-1">Quantité</label>
+                <label className="block text-sm text-zinc-300 mb-1">Temps de conservation (années)</label>
                 <input
                   type="number"
-                  min={1}
-                  max={48}
-                  value={addQuantite}
-                  onChange={(e) => setAddQuantite(Number(e.target.value))}
+                  value={addTempsConservation}
+                  onChange={(e) => setAddTempsConservation(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                  placeholder="ex : 8"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Année limite (à boire avant)</label>
-                <input
-                  type="number"
-                  value={addAnneeLimite}
-                  onChange={(e) => setAddAnneeLimite(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                  placeholder="ex : 2030"
-                />
+              {/* 🆕 Date d’achat + Prix */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Date d’achat</label>
+                  <input
+                    type="date"
+                    value={addDateAchat}
+                    onChange={(e) => setAddDateAchat(e.target.value)}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    placeholder="ex : 2025-11-15"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-300 mb-1">Prix (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={addPrix}
+                    onChange={(e) => setAddPrix(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    placeholder="ex : 24.90"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Ligne : nom + année */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Nom *</label>
-                <input
-                  value={addNom}
-                  onChange={(e) => setAddNom(e.target.value)}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Année</label>
-                <input
-                  type="number"
-                  value={addAnnee}
-                  onChange={(e) => setAddAnnee(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                  placeholder="ex : 2018"
-                />
-              </div>
-            </div>
-
-            {/* Ligne : domaine + type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Domaine</label>
-                <input
-                  value={addDomaine}
-                  onChange={(e) => setAddDomaine(e.target.value)}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Type</label>
-                <select
-                  value={addTypeVin}
-                  onChange={(e) => setAddTypeVin(e.target.value as any)}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={savingAdd}
+                  className="px-4 py-2 rounded-lg bg-[#7b2d26] text-white hover:bg-[#6d2621]"
                 >
-                  <option value="">—</option>
-                  <option value="rouge">rouge</option>
-                  <option value="blanc">blanc</option>
-                  <option value="rosé">rosé</option>
-                </select>
+                  {savingAdd ? 'Ajout…' : 'Ajouter'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddForPillar(null)}
+                  className="px-4 py-2 rounded-lg bg-zinc-700/60 text-zinc-100 hover:bg-zinc-600/70"
+                >
+                  Annuler
+                </button>
               </div>
-            </div>
-
-            {/* Ligne : cépage + accords */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
-                <input
-                  value={addCepage}
-                  onChange={(e) => setAddCepage(e.target.value)}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-300 mb-1">Accords</label>
-                <input
-                  value={addAccords}
-                  onChange={(e) => setAddAccords(e.target.value)}
-                  className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                />
-              </div>
-            </div>
-
-            {/* Temps de conservation (facultatif si année limite fournie) */}
-            <div>
-              <label className="block text-sm text-zinc-300 mb-1">Temps de conservation (années)</label>
-              <input
-                type="number"
-                value={addTempsConservation}
-                onChange={(e) => setAddTempsConservation(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
-                placeholder="ex : 8"
-              />
-            </div>
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={savingAdd}
-                className="px-4 py-2 rounded-lg bg-[#7b2d26] text-white hover:bg-[#6d2621]"
-              >
-                {savingAdd ? 'Ajout…' : 'Ajouter'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAddForPillar(null)}
-                className="px-4 py-2 rounded-lg bg-zinc-700/60 text-zinc-100 hover:bg-zinc-600/70"
-              >
-                Annuler
-              </button>
-            </div>
-          </form>
+            </form>
           </div>
         </div>
       )}
