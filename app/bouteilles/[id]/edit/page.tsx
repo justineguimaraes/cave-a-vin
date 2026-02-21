@@ -5,6 +5,25 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../src/lib/supabase'
 import Link from 'next/link'
 
+// Cépages courants (ajuste la liste à ton goût)
+const CEPAGES_POPULAIRES = [
+  'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Semillon', 'Pinot Gris',
+  'Viognier', 'Chenin Blanc', 'Gewürztraminer', 'Albariño', 'Moscato',
+  'Merlot', 'Cabernet Sauvignon', 'Syrah', 'Grenache', 'Malbec',
+  'Pinot Noir', 'Sangiovese', 'Tempranillo', 'Nebbiolo', 'Zinfandel',
+  'Gamay', 'Carignan', 'Mourvèdre', 'Cabernet Franc', 'Tannat',
+  'Carmenère', 'Touriga Nacional'
+]
+
+const normalizeCepage = (s: string) => {  
+  const x = s.trim()  
+  if (!x) return x  
+  return x    
+    .split(/\s+/)    
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())    
+    .join(' ')
+}
+
 export default function EditBottlePage() {
   const params = useParams<{ id: string }>()
   const id = Number(params.id)
@@ -60,7 +79,7 @@ export default function EditBottlePage() {
         annee: annee === '' ? null : Number(annee),
         domaine: domaine || null,
         type_vin: typeVin || null,
-        cepage: cepage || null,
+        cepage: normalizeCepage(cepage) || null,
         accords: accords || null,
         temps_conservation: tempsConservation === '' ? null : Number(tempsConservation),
 
@@ -138,12 +157,19 @@ export default function EditBottlePage() {
 
           <div>
             <label className="block text-sm font-medium text-rose-200">Cépage</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/50
-                         focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-400/40"
-              value={cepage}
-              onChange={e => setCepage(e.target.value)}
-            />
+              <input
+                list="cepages-list"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/50
+                          focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-400/40"
+                value={cepage}
+                onChange={e => setCepage(e.target.value)}
+                placeholder="Ex. : Chardonnay"
+              />
+              <datalist id="cepages-list">
+                {CEPAGES_POPULAIRES.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
           </div>
 
           <div>

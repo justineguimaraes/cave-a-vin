@@ -45,6 +45,13 @@ const formatDateFR = (v?: string | null) =>
 const formatPrixEUR = (v?: number | null) =>
   v == null ? '—' : new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v)
 
+// Liste de cépages courants (tu peux en enlever/ajouter)
+export const CEPAGES_POPULAIRES = ['Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Semillon', 
+  'Pinot Gris',  'Viognier', 'Chenin Blanc', 'Gewürztraminer', 'Albariño', 'Moscato',  
+  'Merlot', 'Cabernet Sauvignon', 'Syrah', 'Grenache', 'Malbec',  'Pinot Noir', 
+  'Sangiovese', 'Tempranillo', 'Nebbiolo', 'Zinfandel',  'Gamay', 'Carignan', 
+  'Mourvèdre', 'Cabernet Franc', 'Tannat',  'Carmenère', 'Touriga Nacional'];
+
 export default function Cave() {
   const [comps, setComps] = useState<Compartiment[]>([])
   const [selectedRegion, setSelectedRegion] = useState<Compartiment | null>(null)
@@ -597,12 +604,19 @@ export default function Cave() {
               {/* Ligne : cépage + accords */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
+                 <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
                   <input
+                    list="cepages-list"
                     value={addCepage}
                     onChange={(e) => setAddCepage(e.target.value)}
                     className="w-full rounded-lg bg-[#1f171d] border border-[#2d1b22] px-3 py-2 text-zinc-100"
+                    placeholder="Ex. : Chardonnay"
                   />
+                  <datalist id="cepages-list">
+                    {CEPAGES_POPULAIRES.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-sm text-zinc-300 mb-1">Accords</label>
