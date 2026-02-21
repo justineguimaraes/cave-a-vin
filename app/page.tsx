@@ -11,8 +11,8 @@ type Compartiment = {
   compartiment: number
   nb_non_bues: number
   prochaine_date_limite: string | null
-  nb_rouge: number  
-  nb_blanc: number  
+  nb_rouge: number
+  nb_blanc: number
   nb_rose: number
 }
 
@@ -46,11 +46,14 @@ const formatPrixEUR = (v?: number | null) =>
   v == null ? '—' : new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v)
 
 // Liste de cépages courants (tu peux en enlever/ajouter)
-export const CEPAGES_POPULAIRES = ['Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Semillon', 
-  'Pinot Gris',  'Viognier', 'Chenin Blanc', 'Gewürztraminer', 'Albariño', 'Moscato',  
-  'Merlot', 'Cabernet Sauvignon', 'Syrah', 'Grenache', 'Malbec',  'Pinot Noir', 
-  'Sangiovese', 'Tempranillo', 'Nebbiolo', 'Zinfandel',  'Gamay', 'Carignan', 
-  'Mourvèdre', 'Cabernet Franc', 'Tannat',  'Carmenère', 'Touriga Nacional'];
+export const CEPAGES_POPULAIRES = [
+  'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Semillon',
+  'Pinot Gris', 'Viognier', 'Chenin Blanc', 'Gewürztraminer', 'Albariño', 'Moscato',
+  'Merlot', 'Cabernet Sauvignon', 'Syrah', 'Grenache', 'Malbec',
+  'Pinot Noir', 'Sangiovese', 'Tempranillo', 'Nebbiolo', 'Zinfandel',
+  'Gamay', 'Carignan', 'Mourvèdre', 'Cabernet Franc', 'Tannat',
+  'Carmenère', 'Touriga Nacional'
+];
 
 export default function Cave() {
   const [comps, setComps] = useState<Compartiment[]>([])
@@ -85,6 +88,28 @@ export default function Cave() {
     }
     load()
   }, [])
+
+  // ✅ Bloquer le scroll du fond quand une modale est ouverte (iPhone/Safari)
+  useEffect(() => {
+    const modalOpen = selectedRegion !== null || addForPillar !== null
+    const html = document.documentElement
+    const body = document.body
+    const prevHtmlOverflow = html.style.overflow
+    const prevBodyOverflow = body.style.overflow
+
+    if (modalOpen) {
+      html.style.overflow = 'hidden'
+      body.style.overflow = 'hidden'
+    } else {
+      html.style.overflow = ''
+      body.style.overflow = ''
+    }
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow
+      body.style.overflow = prevBodyOverflow
+    }
+  }, [selectedRegion, addForPillar])
 
   // Liste des piliers (1..10)
   const pillars = useMemo(() => Array.from({ length: 10 }, (_, i) => i + 1), [])
@@ -156,7 +181,7 @@ export default function Cave() {
     setAddForPillar(p)
     const regions = compsByPillar.get(p) ?? []
     // par défaut : prendre le plus petit numéro de compartiment dispo dans ce pilier
-    const defaultCompart = regions.length > 0 ? regions.map(r => r.compartiment).sort((a,b)=>a-b)[0] : 1
+    const defaultCompart = regions.length > 0 ? regions.map(r => r.compartiment).sort((a, b) => a - b)[0] : 1
     setAddCompartiment(defaultCompart)
 
     const rid = getRegionIdByPillarAndCompartiment(p, defaultCompart)
@@ -192,13 +217,11 @@ export default function Cave() {
 
     // Calculs : date_limite et/ou temps_conservation
     const qte = Math.min(Math.max(addQuantite, 1), 48) // 1..48
-    const dateLimite =
-      addAnneeLimite !== '' ? `${addAnneeLimite}-12-31` : null
+    const dateLimite = addAnneeLimite !== '' ? `${addAnneeLimite}-12-31` : null
 
     // Si l’utilisateur a fourni année + année limite mais pas de temps_conservation,
     // on peut déduire temps_conservation = année_limite - année (min 0)
-    let computedTemps: number | null =
-      addTempsConservation === '' ? null : Number(addTempsConservation)
+    let computedTemps: number | null = addTempsConservation === '' ? null : Number(addTempsConservation)
     if (computedTemps === null && addAnnee !== '' && addAnneeLimite !== '') {
       const diff = Number(addAnneeLimite) - Number(addAnnee)
       computedTemps = diff >= 0 ? diff : 0
@@ -286,7 +309,7 @@ export default function Cave() {
 
                 {/* 4 compartiments en vertical */}
                 <div className="mt-3 space-y-3">
-                  {(regions.length ? regions : [1,2,3,4].map(i => ({
+                  {(regions.length ? regions : [1, 2, 3, 4].map(i => ({
                     region_id: -1_000 - i,
                     region_nom: '—',
                     pilier: p,
@@ -314,53 +337,42 @@ export default function Cave() {
                       </div>
                       {c.nb_non_bues > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {c.nb_non_bues > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {(() => {
-                                // on limite à 10 points d’aperçu
-                                const cap = 10
-                                let remaining = Math.min(c.nb_non_bues, cap)
+                          {/* pastilles de composition par type */}
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {(() => {
+                              // limite 10 points d’aperçu
+                              const cap = 10
+                              let remaining = Math.min(c.nb_non_bues, cap)
 
-                                // Calcule combien afficher par type, sans dépasser 'remaining'
-                                const chunks: { n: number; cls: string }[] = []
-                                const pushChunk = (n: number, cls: string) => {
-                                  const k = Math.min(n, remaining)
-                                  for (let i = 0; i < k; i++) {
-                                    chunks.push({ n: 1, cls })
-                                  }
-                                  remaining -= k
-                                }
+                              const chunks: { n: number; cls: string }[] = []
+                              const pushChunk = (n: number, cls: string) => {
+                                const k = Math.min(n, remaining)
+                                for (let i = 0; i < k; i++) chunks.push({ n: 1, cls })
+                                remaining -= k
+                              }
 
-                                // classes selon type (blanc => pastille blanche avec bordure)
-                                const clsRouge = 'bg-[#7b2d26]'
-                                const clsBlanc = 'bg-white border border-zinc-400'
-                                const clsRose  = 'bg-[#f2b6c1]'
+                              const clsRouge = 'bg-[#7b2d26]'
+                              const clsBlanc = 'bg-white border border-zinc-400'
+                              const clsRose  = 'bg-[#f2b6c1]'
 
-                                // 👉 ordre d’affichage: rouge, blanc, rosé (adapte si tu veux un autre ordre)
-                                pushChunk(c.nb_rouge, clsRouge)
-                                pushChunk(c.nb_blanc, clsBlanc)
-                                pushChunk(c.nb_rose,  clsRose)
+                              pushChunk(c.nb_rouge, clsRouge)
+                              pushChunk(c.nb_blanc, clsBlanc)
+                              pushChunk(c.nb_rose,  clsRose)
 
-                                return (
-                                  <>
-                                    {chunks.map((it, i) => (
-                                      <span key={i} className={`w-2.5 h-2.5 rounded-full ${it.cls}`} />
-                                    ))}
-                                    {c.nb_non_bues > cap && (
-                                      <span className="text-[10px] text-zinc-400">
-                                        +{c.nb_non_bues - cap}
-                                      </span>
-                                    )}
-                                  </>
-                                )
-                              })()}
-                            </div>
-                          )}
-                          {c.nb_non_bues > 10 && (
-                            <span className="text-[10px] text-zinc-400">
-                              +{c.nb_non_bues - 10}
-                            </span>
-                          )}
+                              return (
+                                <>
+                                  {chunks.map((it, i) => (
+                                    <span key={i} className={`w-2.5 h-2.5 rounded-full ${it.cls}`} />
+                                  ))}
+                                  {c.nb_non_bues > cap && (
+                                    <span className="text-[10px] text-zinc-400">
+                                      +{c.nb_non_bues - cap}
+                                    </span>
+                                  )}
+                                </>
+                              )
+                            })()}
+                          </div>
                         </div>
                       )}
                     </button>
@@ -376,11 +388,11 @@ export default function Cave() {
       {selectedRegion && (
         <div
           onClick={() => { setSelectedRegion(null); setSelectedBouteille(null); }}
-          className="fixed inset-0 z-20 bg-black/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-20 bg-black/60 flex items-start justify-center p-4 overflow-y-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-4xl max-h-[85vh] overflow-auto bg-[#171217] rounded-2xl shadow-2xl ring-1 ring-[#2d1b22]"
+            className="w-full max-w-4xl bg-[#171217] rounded-2xl shadow-2xl ring-1 ring-[#2d1b22] p-5 mt-10 mb-10 overflow-y-auto max-h-[90vh]"
           >
             <div className="p-5 border-b border-[#2a1a21] flex items-center justify-between">
               <div>
@@ -494,11 +506,11 @@ export default function Cave() {
       {addForPillar !== null && (
         <div
           onClick={() => setAddForPillar(null)}
-          className="fixed inset-0 z-30 bg-black/70 flex items-center justify-center p-4"
+          className="fixed inset-0 z-30 bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl bg-[#171217] rounded-2xl shadow-2xl ring-1 ring-[#2d1b22] p-5"
+            className="w-full max-w-xl bg-[#171217] rounded-2xl shadow-2xl ring-1 ring-[#2d1b22] p-5 mt-10 mb-10 overflow-y-auto max-h-[90vh]"
           >
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-[#f0e6e4]">Ajouter un vin — Pilier {addForPillar}</h3>
@@ -513,7 +525,7 @@ export default function Cave() {
                   <input
                     type="number"
                     min={1}
-                    max={4} // adapte si tu as > 4 compartiments par pilier
+                    max={4}
                     value={addCompartiment}
                     onChange={(e) => {
                       const v = Number(e.target.value)
@@ -604,7 +616,7 @@ export default function Cave() {
               {/* Ligne : cépage + accords */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                 <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
+                  <label className="block text-sm text-zinc-300 mb-1">Cépage</label>
                   <input
                     list="cepages-list"
                     value={addCepage}
