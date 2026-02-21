@@ -11,6 +11,9 @@ type Compartiment = {
   compartiment: number
   nb_non_bues: number
   prochaine_date_limite: string | null
+  nb_rouge: number  
+  nb_blanc: number  
+  nb_rose: number
 }
 
 type Bouteille = {
@@ -70,7 +73,7 @@ export default function Cave() {
 
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await supabase.from('v_compartiments').select('*')
+      const { data, error } = await supabase.from('v_compartiments_enrichi').select('*')
       if (!error) setComps((data ?? []) as Compartiment[])
     }
     load()
@@ -304,9 +307,48 @@ export default function Cave() {
                       </div>
                       {c.nb_non_bues > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {Array.from({ length: Math.min(c.nb_non_bues, 10) }).map((_, i) => (
-                            <span key={i} className="w-2.5 h-2.5 rounded-full bg-[#b08a8a]" />
-                          ))}
+                          {c.nb_non_bues > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {(() => {
+                                // on limite à 10 points d’aperçu
+                                const cap = 10
+                                let remaining = Math.min(c.nb_non_bues, cap)
+
+                                // Calcule combien afficher par type, sans dépasser 'remaining'
+                                const chunks: { n: number; cls: string }[] = []
+                                const pushChunk = (n: number, cls: string) => {
+                                  const k = Math.min(n, remaining)
+                                  for (let i = 0; i < k; i++) {
+                                    chunks.push({ n: 1, cls })
+                                  }
+                                  remaining -= k
+                                }
+
+                                // classes selon type (blanc => pastille blanche avec bordure)
+                                const clsRouge = 'bg-[#7b2d26]'
+                                const clsBlanc = 'bg-white border border-zinc-400'
+                                const clsRose  = 'bg-[#f2b6c1]'
+
+                                // 👉 ordre d’affichage: rouge, blanc, rosé (adapte si tu veux un autre ordre)
+                                pushChunk(c.nb_rouge, clsRouge)
+                                pushChunk(c.nb_blanc, clsBlanc)
+                                pushChunk(c.nb_rose,  clsRose)
+
+                                return (
+                                  <>
+                                    {chunks.map((it, i) => (
+                                      <span key={i} className={`w-2.5 h-2.5 rounded-full ${it.cls}`} />
+                                    ))}
+                                    {c.nb_non_bues > cap && (
+                                      <span className="text-[10px] text-zinc-400">
+                                        +{c.nb_non_bues - cap}
+                                      </span>
+                                    )}
+                                  </>
+                                )
+                              })()}
+                            </div>
+                          )}
                           {c.nb_non_bues > 10 && (
                             <span className="text-[10px] text-zinc-400">
                               +{c.nb_non_bues - 10}
