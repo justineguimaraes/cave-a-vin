@@ -309,15 +309,21 @@ export default function Cave() {
 
                 {/* 4 compartiments en vertical */}
                 <div className="mt-3 space-y-3">
-                  {(regions.length ? regions : [1, 2, 3, 4].map(i => ({
-                    region_id: -1_000 - i,
-                    region_nom: '—',
-                    pilier: p,
-                    compartiment: i,
-                    nb_non_bues: 0,
-                    prochaine_date_limite: null
-                  } as any))).map((c) => (
-                    <button
+                  {Array.from({ length: 4 }, (_, i) => {
+                      const comp = regions.find(r => r.compartiment === i + 1)
+                      return comp ?? {
+                        region_id: -1_000 - i,
+                        region_nom: '—',
+                        pilier: p,
+                        compartiment: i + 1,
+                        nb_non_bues: 0,
+                        prochaine_date_limite: null,
+                        nb_rouge: 0,
+                        nb_blanc: 0,
+                        nb_rose: 0,
+                      } as any
+                    }).map((c) => (
+                      <button
                       key={`${p}-${c.compartiment}-${c.region_id}`}
                       onClick={() => c.region_id > 0 && openCompartiment(c)}
                       className={[
